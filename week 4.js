@@ -9,26 +9,13 @@ const port = 3000;
 
 app.use(express.json());
 
-// JWT Middleware (authorization checker)
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) return res.status(401).send({ error: 'Access denied. No token provided.' });
-
-    jwt.verify(token, 'secretkey', (err, user) => {
-        if (err) return res.status(403).send({ error: 'Invalid token.' });
-        req.user = user;
-        next();
-    });
-}
-
 // MongoDB connection
 const uri = "mongodb://localhost:27017";
 const client = new MongoClient(uri);
 let rideCollection;
 let userCollection;
 
+// Connect to MongoDB
 async function connectDB() {
     try {
         await client.connect();
@@ -52,30 +39,13 @@ const rideSchema = Joi.object({
     price: Joi.number().required()
 });
 
-// 🔐 Protected CRUD Routes with Pagination + Filtering
-app.get('/rides', authenticateToken, async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
-        const skip = (page - 1) * limit;
-
-        const driver = req.query.driver;
-        let filter = {};
-        if (driver) {
-            filter.driver = { $regex: driver, $options: 'i' };
-        }
-
-        const rides = await rideCollection.find(filter).skip(skip).limit(limit).toArray();
-        res.send(rides);
-    } catch (err) {
-        res.status(500).send(err);
-    }
-});
-
-app.post('/rides', authenticateToken, async (req, res) => {
+// CRUD for rides
+app.post('/rides', async (req, res) => {
     try {
         const { error } = rideSchema.validate(req.body);
-        if (error) return res.status(400).send({ error: error.details[0].message });
+        if (error) {
+            return res.status(400).send({ error: error.details[0].message });
+        }
 
         const result = await rideCollection.insertOne(req.body);
         res.send(result);
@@ -84,10 +54,21 @@ app.post('/rides', authenticateToken, async (req, res) => {
     }
 });
 
-app.put('/rides/:id', authenticateToken, async (req, res) => {
+app.get('/rides', async (req, res) => {
+    try {
+        const rides = await rideCollection.find().toArray();
+        res.send(rides);
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+app.put('/rides/:id', async (req, res) => {
     try {
         const { error } = rideSchema.validate(req.body);
-        if (error) return res.status(400).send({ error: error.details[0].message });
+        if (error) {
+            return res.status(400).send({ error: error.details[0].message });
+        }
 
         const result = await rideCollection.updateOne(
             { _id: new ObjectId(req.params.id) },
@@ -99,7 +80,7 @@ app.put('/rides/:id', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/rides/:id', authenticateToken, async (req, res) => {
+app.delete('/rides/:id', async (req, res) => {
     try {
         const result = await rideCollection.deleteOne({ _id: new ObjectId(req.params.id) });
         res.send(result);
@@ -108,14 +89,20 @@ app.delete('/rides/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Public: User Registration
+// Registration (Signup)
 app.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
-        if (!username || !password) return res.status(400).send({ error: 'Username and password are required' });
 
+        if (!username || !password) {
+            return res.status(400).send({ error: 'Username and password are required' });
+        }
+
+        // Check if username already exists
         const existingUser = await userCollection.findOne({ username });
-        if (existingUser) return res.status(400).send({ error: 'Username already taken' });
+        if (existingUser) {
+            return res.status(400).send({ error: 'Username already taken' });
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const result = await userCollection.insertOne({ username, password: hashedPassword });
@@ -125,15 +112,20 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Public: User Login
+// Login
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
         const user = await userCollection.findOne({ username });
-        if (!user) return res.status(400).send({ error: 'Invalid username' });
+        if (!user) {
+            return res.status(400).send({ error: 'Invalid username' });
+        }
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) return res.status(400).send({ error: 'Invalid password' });
+        if (!isPasswordValid) {
+            return res.status(400).send({ error: 'Invalid password' });
+        }
 
         const token = jwt.sign({ username }, 'secretkey', { expiresIn: '1h' });
         res.send({ message: 'Login successful', token });

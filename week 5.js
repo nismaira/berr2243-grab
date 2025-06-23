@@ -52,26 +52,7 @@ const rideSchema = Joi.object({
     price: Joi.number().required()
 });
 
-// 🔐 Protected CRUD Routes with Pagination + Filtering
-app.get('/rides', authenticateToken, async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
-        const skip = (page - 1) * limit;
-
-        const driver = req.query.driver;
-        let filter = {};
-        if (driver) {
-            filter.driver = { $regex: driver, $options: 'i' };
-        }
-
-        const rides = await rideCollection.find(filter).skip(skip).limit(limit).toArray();
-        res.send(rides);
-    } catch (err) {
-        res.status(500).send(err);
-    }
-});
-
+// 🔐 Protected CRUD Routes (with token)
 app.post('/rides', authenticateToken, async (req, res) => {
     try {
         const { error } = rideSchema.validate(req.body);
@@ -79,6 +60,15 @@ app.post('/rides', authenticateToken, async (req, res) => {
 
         const result = await rideCollection.insertOne(req.body);
         res.send(result);
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+app.get('/rides', authenticateToken, async (req, res) => {
+    try {
+        const rides = await rideCollection.find().toArray();
+        res.send(rides);
     } catch (err) {
         res.status(500).send(err);
     }
@@ -108,7 +98,7 @@ app.delete('/rides/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Public: User Registration
+// 👤 Public route: User Registration
 app.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -125,13 +115,14 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Public: User Login
+// 👤 Public route: User Login
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
         const user = await userCollection.findOne({ username });
         if (!user) return res.status(400).send({ error: 'Invalid username' });
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) return res.status(400).send({ error: 'Invalid password' });
 
