@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MyTaxi Dashboard (Debug Version)</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="p-4">
+    <h1>MyTaxi Dashboard (Debug Mode)</h1>
+
+    <h2>Ride List</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Driver</th>
+                <th>Passenger</th>
+                <th>Pickup</th>
+                <th>Destination</th>
+                <th>Price (RM)</th>
+            </tr>
+        </thead>
+        <tbody id="rideTableBody"></tbody>
+    </table>
+
+    <h2>Add New Ride</h2>
+    <form id="rideForm">
+        <input type="text" id="driver" placeholder="Driver" class="form-control mb-2">
+        <input type="text" id="passenger" placeholder="Passenger" class="form-control mb-2">
+        <input type="text" id="pickup" placeholder="Pickup" class="form-control mb-2">
+        <input type="text" id="destination" placeholder="Destination" class="form-control mb-2">
+        <input type="number" id="price" placeholder="Price" class="form-control mb-2">
+        <button type="submit" class="btn btn-primary">Add Ride</button>
+    </form>
+
+    <div id="message" class="mt-3"></div>
+
+    <script>
+        const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im5pc2JlcnIiLCJpYXQiOjE3NTA3NzU5NTksImV4cCI6MTc1MDc3OTU1OX0.pJgp6OtU_lyFfTpfvEARsqfZEB-fGsZpK1m1Ml2V-hs"; // Replace this with your full token
+
+        function loadRides() {
+            fetch('http://localhost:3000/rides', {
+                headers: {
+                    Authorization: Bearer ${token}
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load rides: " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                const tableBody = document.getElementById('rideTableBody');
+                tableBody.innerHTML = "";
+                data.forEach(ride => {
+                    const row = `<tr>
+                        <td>${ride.driver}</td>
+                        <td>${ride.passenger}</td>
+                        <td>${ride.pickup}</td>
+                        <td>${ride.destination}</td>
+                        <td>${ride.price}</td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(err => {
+                document.getElementById('message').innerText = err;
+            });
+        }
+
+        loadRides();
+
+        document.getElementById('rideForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const ride = {
+                driver: document.getElementById('driver').value,
+                passenger: document.getElementById('passenger').value,
+                pickup: document.getElementById('pickup').value,
+                destination: document.getElementById('destination').value,
+                price: parseFloat(document.getElementById('price').value)
+            };
+
+            fetch('http://localhost:3000/rides', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: Bearer ${token}
+                },
+                body: JSON.stringify(ride)
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to add ride: " + res.status);
+                return res.json();
+            })
+            .then(() => {
+                document.getElementById('message').innerText = "Ride added successfully!";
+                loadRides();
+            })
+            .catch(err => {
+                document.getElementById('message').innerText = err;
+            });
+        });
+    </script>
+</body>
+</html>
